@@ -5,13 +5,23 @@ import arcpy
 
 file_path = r"C:\Users\axel.kunz\Desktop\daten\overall.txt"
 shape_path = r"C:\Users\axel.kunz\Desktop\daten\plz_brd-XX.shp"
-output_path = ""
+output_path = r"C:\Users\axel.kunz\Desktop\daten\output.shp"
 output_txt = r"C:\Users\axel.kunz\Desktop\daten\legend.txt"
 shp_plz_field = "leitregion"
 
-## TODO: save as new shape
 
-# id, geschlecht, alter, hochschule, hochschultyp, abschluss, heimat-plz, momentanter-wohnsitz
+class ShapeExtender(object):
+    def __ini__(self, csv_path, shp_path, output_path):
+        self.csv_path = csv_path
+        self.shp_path = shp_path
+        self.output_path = output_path
+        print "new init"
+
+
+class ShapefileExistsException(Exception):
+    pass
+
+
 def get_count_all(file_path, index):
     """ return list of plz, shorten them o the first
         two digits
@@ -78,9 +88,9 @@ def get_count_insti(file_path, index, insti_name):
     return Counter(result_list)  # count items
 
 
-def update_shape(data, shape_path, new_field_name):
+def update_shape(data, output_path, new_field_name):
     plz_field_name = shp_plz_field
-    cursor = arcpy.UpdateCursor(shape_path)   # TODO: specify fields
+    cursor = arcpy.UpdateCursor(output_path)   # TODO: specify fields
     for row in cursor:  # loop shapefile
         shp_plz_value = row.getValue(plz_field_name)
         #print str(row.getValue(plz_field_name))
@@ -109,44 +119,67 @@ def get_unique_institutes():
     return result_list
 
 
-# all
-count = get_count_all(file_path, 6)
-update_shape(count, shape_path, "count")
-
-# female
-count_female = get_count_female(file_path, 6)
-#arcpy.AddField_management(shape_path, "count_f", "LONG", 9)
-update_shape(count_female, shape_path, "count_f")
-
-# male
-count_male = get_count_male(file_path, 6)
-#arcpy.AddField_management(shape_path, "count_m", "LONG", 9)
-update_shape(count_male, shape_path, "count_m")
-
-# institutions
-csv_file = open(output_txt, "wb")
-csv_writer = csv.writer(csv_file, delimiter=",")
-
-insti_count_list = []
-
-for i, insti in enumerate(get_unique_institutes()):
-    count_insti = get_count_insti(file_path, 6, insti)
+def clean_up():
+    print("Cleaning up ...")
     try:
-        arcpy.AddField_management(in_table=shape_path,
-                                  field_name="insti_{}".format(i),
-                                  field_type="LONG",
-                                  field_precision=9,
-                                  field_alias=insti)  # only works for gdbs
+        arcpy.Delete_management(output_path)
+        arcpy.Delete_management(output_txt)
     except:
-        print "failed to add field"
+        pass
+
+
+new_extender = ShapeExtender()
+"""
+try:
+    # copy shapefile to output location
+    if arcpy.Exists(output_path):
+        raise ShapefileExistsException("%s already exists!" % output_path)
+
+    try:
+        arcpy.CopyFeatures_management(shape_path, output_path)
+    except:
+        print("failed to copy shapefile")
         print(arcpy.GetMessages())
+    # all
+    count = get_count_all(file_path, 6)
+    arcpy.AddField_management(output_path, "count", "LONG", 9)
+    update_shape(count, output_path, "count")
 
-    update_shape(count_insti, shape_path, "insti_{}".format(i))
-    csv_writer.writerow([i, "insti_{}".format(i), insti])
+    # female
+    count_female = get_count_female(file_path, 6)
+    arcpy.AddField_management(output_path, "count_f", "LONG", 9)
+    update_shape(count_female, output_path, "count_f")
 
-csv_file.close()
+    # male
+    count_male = get_count_male(file_path, 6)
+    arcpy.AddField_management(output_path, "count_m", "LONG", 9)
+    update_shape(count_male, output_path, "count_m")
 
-for field in arcpy.ListFields(shape_path):
-    print field.aliasName
+    # institutions
+    csv_file = open(output_txt, "wb")
+    csv_writer = csv.writer(csv_file, delimiter=",")
 
-print "done!"
+    insti_count_list = []
+
+    for i, insti in enumerate(get_unique_institutes()):
+        count_insti = get_count_insti(file_path, 6, insti)
+        try:
+            arcpy.AddField_management(in_table=output_path,
+                                      field_name="insti_{}".format(i),
+                                      field_type="LONG",
+                                      field_precision=9,
+                                      field_alias=insti)  # only works for gdbs
+        except:
+            print "failed to add field"
+            print(arcpy.GetMessages())
+
+        update_shape(count_insti, output_path, "insti_{}".format(i))
+        csv_writer.writerow([i, "insti_{}".format(i), insti])
+
+    csv_file.close()
+
+    print "completed successfully!"
+except:
+    print("something went wrong!")
+    clean_up()
+"""
