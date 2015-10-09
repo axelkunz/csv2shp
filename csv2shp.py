@@ -18,7 +18,7 @@ import arcpy
 file_path = r"C:\Users\axel.kunz\Desktop\daten\overall.txt"
 shape_path = r"C:\Users\axel.kunz\Desktop\daten\plz_brd-XX.shp"
 shp_plz_field = "leitregion"
-output_path = r"C:\Users\axel.kunz\Desktop\daten\output.shp"
+output_path = r"C:\Users\axel.kunz\Desktop\daten2\output.shp"
 
 
 class ShapefileExistsException(Exception):
@@ -134,19 +134,22 @@ def clean_up():
     except:
         pass
 
-
-def main():
-
+if __name__ == "__main__":
+    print("processing...")
+    arcpy.AddMessage("processing...")
     # make script compatible as arcmap tool
     if arcpy.GetParameterAsText(0):  # input csv is set
         file_path = arcpy.GetParameterAsText(0)
     if arcpy.GetParameterAsText(1):  # input shape is set
         shape_path = arcpy.GetParameterAsText(1)
     if arcpy.GetParameterAsText(2):  # output shape is set
+        print "arcGIS tool!"
         output_path = arcpy.GetParameterAsText(2)
 
     # get output path to save txt into it
+    print "before output path"
     output_dir = os.path.dirname(output_path)
+    print "after output path"
     output_txt = os.path.join(output_dir, "legend.txt")
 
     try:
@@ -214,6 +217,3 @@ def main():
         arcpy.AddError("something went wrong! cleaning up ...")
         clean_up()
 
-
-if __name__ == "__main__":
-    main()
