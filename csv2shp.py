@@ -1,28 +1,35 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+
+""" csv2shp.py: appends plz counts to shapefile """
+
+__author__ = "Axel Kunz"
+__email__ = "axel.kunz@hs-mainz.com"
+__status__ = "Development"
+
+
+import os
 import csv
 from collections import Counter
 import arcpy
 
+
+# will get overwritten when used as arcgis tool
 file_path = r"C:\Users\axel.kunz\Desktop\daten\overall.txt"
 shape_path = r"C:\Users\axel.kunz\Desktop\daten\plz_brd-XX.shp"
-output_path = r"C:\Users\axel.kunz\Desktop\daten\output.shp"
-output_txt = r"C:\Users\axel.kunz\Desktop\daten\legend.txt"
 shp_plz_field = "leitregion"
-
-
-class ShapeExtender(object):
-    def __ini__(self, csv_path, shp_path, output_path):
-        self.csv_path = csv_path
-        self.shp_path = shp_path
-        self.output_path = output_path
-        print "new init"
+output_path = r"C:\Users\axel.kunz\Desktop\daten\output.shp"
 
 
 class ShapefileExistsException(Exception):
     pass
 
 
-def get_count_all(file_path, index):
+class CouldNotCopyShapeException(Exception):
+    pass
+
+
+def get_count_all(file_path):
     """ return list of plz, shorten them o the first
         two digits
     """
@@ -30,12 +37,12 @@ def get_count_all(file_path, index):
     with open(file_path, "rb") as f:
         for items in csv.reader(f, delimiter="\t"):
 
-            result_list.append(items[index][0:2])   # append only first two digits of plz
+            result_list.append(items[6][0:2])   # append only first two digits of plz
 
     return Counter(result_list)  # count items
 
 
-def get_count_female(file_path, index):
+def get_count_female(file_path):
     """ return list of plz, shorten them o the first
         two digits
     """
@@ -48,12 +55,12 @@ def get_count_female(file_path, index):
             if gender != "weiblich": gender = "maennlich"
 
             if gender == "weiblich":
-                result_list.append(items[index][0:2])   # append only first two digits of plz
+                result_list.append(items[6][0:2])   # append only first two digits of plz
 
     return Counter(result_list)  # count items
 
 
-def get_count_male(file_path, index):
+def get_count_male(file_path):
     """ return list of plz, shorten them o the first
         two digits
     """
@@ -66,12 +73,12 @@ def get_count_male(file_path, index):
             if gender != "weiblich": gender = "maennlich"
 
             if gender == "maennlich":
-                result_list.append(items[index][0:2])   # append only first two digits of plz
+                result_list.append(items[6][0:2])   # append only first two digits of plz
 
     return Counter(result_list)  # count items
 
 
-def get_count_insti(file_path, index, insti_name):
+def get_count_insti(file_path, insti_name):
     """ return list of plz, shorten them o the first
         two digits
     """
@@ -83,7 +90,7 @@ def get_count_insti(file_path, index, insti_name):
             insti = items[3]
             #print insti.encode("utf-8")
             if insti == insti_name:
-                result_list.append(items[index][0:2])   # append only first two digits of plz
+                result_list.append(items[6][0:2])   # append only first two digits of plz
 
     return Counter(result_list)  # count items
 
@@ -128,58 +135,85 @@ def clean_up():
         pass
 
 
-new_extender = ShapeExtender()
-"""
-try:
-    # copy shapefile to output location
-    if arcpy.Exists(output_path):
-        raise ShapefileExistsException("%s already exists!" % output_path)
+def main():
+
+    # make script compatible as arcmap tool
+    if arcpy.GetParameterAsText(0):  # input csv is set
+        file_path = arcpy.GetParameterAsText(0)
+    if arcpy.GetParameterAsText(1):  # input shape is set
+        shape_path = arcpy.GetParameterAsText(1)
+    if arcpy.GetParameterAsText(2):  # output shape is set
+        output_path = arcpy.GetParameterAsText(2)
+
+    # get output path to save txt into it
+    output_dir = os.path.dirname(output_path)
+    output_txt = os.path.join(output_dir, "legend.txt")
 
     try:
-        arcpy.CopyFeatures_management(shape_path, output_path)
-    except:
-        print("failed to copy shapefile")
-        print(arcpy.GetMessages())
-    # all
-    count = get_count_all(file_path, 6)
-    arcpy.AddField_management(output_path, "count", "LONG", 9)
-    update_shape(count, output_path, "count")
+        # copy shapefile to output location
+        if arcpy.Exists(output_path):
+            raise ShapefileExistsException("%s already exists!" % output_path)
 
-    # female
-    count_female = get_count_female(file_path, 6)
-    arcpy.AddField_management(output_path, "count_f", "LONG", 9)
-    update_shape(count_female, output_path, "count_f")
-
-    # male
-    count_male = get_count_male(file_path, 6)
-    arcpy.AddField_management(output_path, "count_m", "LONG", 9)
-    update_shape(count_male, output_path, "count_m")
-
-    # institutions
-    csv_file = open(output_txt, "wb")
-    csv_writer = csv.writer(csv_file, delimiter=",")
-
-    insti_count_list = []
-
-    for i, insti in enumerate(get_unique_institutes()):
-        count_insti = get_count_insti(file_path, 6, insti)
         try:
-            arcpy.AddField_management(in_table=output_path,
-                                      field_name="insti_{}".format(i),
-                                      field_type="LONG",
-                                      field_precision=9,
-                                      field_alias=insti)  # only works for gdbs
+            arcpy.CopyFeatures_management(shape_path, output_path)
         except:
-            print "failed to add field"
-            print(arcpy.GetMessages())
+            arcpy.AddError("failed to copy shapefile")
+            raise CouldNotCopyShapeException("failed to copy shapefile")
 
-        update_shape(count_insti, output_path, "insti_{}".format(i))
-        csv_writer.writerow([i, "insti_{}".format(i), insti])
+        # get all
+        count = get_count_all(file_path)
+        try:
+            arcpy.AddField_management(output_path, "count", "LONG", 9)
+        except:
+            print("couldnt create field")
 
-    csv_file.close()
+        update_shape(count, output_path, "count")
 
-    print "completed successfully!"
-except:
-    print("something went wrong!")
-    clean_up()
-"""
+        # female
+        count_female = get_count_female(file_path)
+        try:
+            arcpy.AddField_management(output_path, "count_f", "LONG", 9)
+        except:
+            print("couldnt create field")
+        update_shape(count_female, output_path, "count_f")
+
+        # male
+        count_male = get_count_male(file_path)
+        try:
+            arcpy.AddField_management(output_path, "count_m", "LONG", 9)
+        except:
+            print("couldnt create field")
+        update_shape(count_male, output_path, "count_m")
+
+        # institutions
+        csv_file = open(output_txt, "wb")
+        csv_writer = csv.writer(csv_file, delimiter=",")
+
+        insti_count_list = []
+
+        for i, insti in enumerate(get_unique_institutes()):
+            count_insti = get_count_insti(file_path, insti)
+            try:
+                arcpy.AddField_management(in_table=output_path,
+                                          field_name="insti_{}".format(i),
+                                          field_type="LONG",
+                                          field_precision=9,
+                                          field_alias=insti)  # only works for gdbs
+            except:
+                print("couldnt create field")
+
+            update_shape(count_insti, output_path, "insti_{}".format(i))
+            csv_writer.writerow([i, "insti_{}".format(i), insti])
+
+        csv_file.close()
+
+        print("completed successfully!")
+        arcpy.AddWarning("completed successfully!")
+    except:
+        print("something went wrong! cleaning up ...")
+        arcpy.AddError("something went wrong! cleaning up ...")
+        clean_up()
+
+
+if __name__ == "__main__":
+    main()
